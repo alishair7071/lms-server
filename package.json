@@ -5,10 +5,15 @@
   "license": "ISC",
   "author": "ali shair",
   "type": "commonjs",
-  "main": "server.js",
+  "main": "build/server.js",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node-dev --respawn --transpile-only server.ts"
+    "dev": "ts-node-dev --respawn --transpile-only server.ts",
+    "build": "tsc",
+    "start": "node build/server.js"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -18,6 +23,7 @@
     "@types/ejs": "^3.1.5",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.17.14",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.2",
     "@types/socket.io": "^3.0.1",

@@ -18,7 +18,16 @@ cloudinary.config({
 });
 
 //create server
-server.listen(process.env.PORT, () => {
-  console.log(`Server is running on port ${process.env.PORT}`);
-  connectDB();
-});
+const PORT = Number(process.env.PORT) || 10000;
+const HOST = process.env.HOST || "0.0.0.0";
+
+connectDB()
+  .then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`Server is running on ${HOST}:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to connect to MongoDB. Exiting...", err);
+    process.exit(1);
+  });
