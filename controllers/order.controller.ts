@@ -105,7 +105,7 @@ export const createOrder = catchAsyncErrors(
 
       // Store consistently with the user schema: { courseId: string }
       user?.courses.push({ courseId: course._id.toString() } as any);
-      await redis.set(req.user!._id as string, JSON.stringify(user));
+      await redis.set(String(req.user!._id), JSON.stringify(user));
       await user?.save();
       course.purchased = (course.purchased || 0) + 1;
       await course.save();

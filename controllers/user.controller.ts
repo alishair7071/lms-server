@@ -172,7 +172,7 @@ export const logoutUser = catchAsyncErrors(
       res.cookie("access_token", "", { maxAge: 1 });
       res.cookie("refresh_token", "", { maxAge: 1 });
 
-      const userId = (req.user?._id as string) || "";
+      const userId = req.user?._id ? String(req.user._id) : "";
 
       await redis.del(userId);
       console.log("logged out successfully from the server");
@@ -199,7 +199,7 @@ export const updateAccessToken = catchAsyncErrors(
       if (!decode) {
         return next(new ErrorHandler("Could not Refresh token", 400));
       }
-      const session = await redis.get(decode.id as string);
+      const session = await redis.get(String(decode.id));
       if (!session) {
         return next(
           new ErrorHandler("Session expired, please login again!", 401)
@@ -218,7 +218,7 @@ export const updateAccessToken = catchAsyncErrors(
       res.cookie("access_token", accessToken, accessTokenOptions);
       res.cookie("refresh_token", refresh_Token, refreshTokenOptions);
 
-      await redis.set(user._id, JSON.stringify(user), "EX", 604800);
+      await redis.set(String(user._id), JSON.stringify(user), "EX", 604800);
 
       next();
     } catch (error: any) {
@@ -231,7 +231,7 @@ export const updateAccessToken = catchAsyncErrors(
 export const getUserInfo = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = (req.user?._id as string) || "";
+      const userId = req.user?._id ? String(req.user._id) : "";
       getUserById(userId, res);
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 400));
@@ -272,7 +272,7 @@ export const updateUserInfo = catchAsyncErrors(
     console.log("entered in update user info");
     try {
       const { name, email } = req.body as IUpdateUserInfo;
-      const userId = req.user?._id as string;
+      const userId = req.user?._id ? String(req.user._id) : "";
       if (!userId) {
         return next(new Error("User ID is undefined"));
       }
@@ -316,7 +316,7 @@ export const updateUserPassword = catchAsyncErrors(
       }
       user.password = newPassword;
       await user.save();
-      const userId = (req.user?._id as string) || "";
+      const userId = req.user?._id ? String(req.user._id) : "";
       if (!userId) {
         return next(new Error("User ID is undefined"));
       }
@@ -343,7 +343,7 @@ export const updateUserProfilePicture = catchAsyncErrors(
     try {
       console.log("entered in try");
       const { avatar } = req.body as IUpdateProfilePicture;
-      const userId = req.user?._id as string;
+      const userId = req.user?._id ? String(req.user._id) : "";
       const user = await userModel.findById(userId);
       if (avatar && user) {
         console.log("entered in if block ");
@@ -416,13 +416,17 @@ export const updateUserRole = catchAsyncErrors(
 export const deleteUser = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const idParam = (req.params as any).id as string | string[] | undefined;
+      const id = Array.isArray(idParam) ? idParam[0] : idParam;
+      if (!id) {
+        return next(new ErrorHandler("User id is required", 400));
+      }
       const user = await userModel.findById(id);
       if (!user) {
         return next(new ErrorHandler("User not found", 400));
       }
       await user.deleteOne({ id });
-      await redis.del(id);
+      await redis.del(String(id));
       res.status(201).json({
         success: true,
         message: "User deleted successfully.",

@@ -94,7 +94,13 @@ export const editCourse = catchAsyncErrors(
 export const getSingleCourse = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const courseId = req.params.id;
+      const courseIdParam = (req.params as any).id as string | string[] | undefined;
+      const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : courseIdParam;
+
+      if (!courseId) {
+        return next(new ErrorHandler("Course id is required", 400));
+      }
+
       const isCacheExits = await redis.get(courseId);
       if (isCacheExits) {
         const course = JSON.parse(isCacheExits);
@@ -103,7 +109,7 @@ export const getSingleCourse = catchAsyncErrors(
           course,
         });
       } else {
-        const course = await CourseModel.findById(req.params.id).select(
+        const course = await CourseModel.findById(courseId).select(
           "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
         );
         await redis.set(courseId, JSON.stringify(course), "EX", 604800);
@@ -316,7 +322,12 @@ export const addReview = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userCourseList = req.user?.courses;
-      const courseId = req.params.id;
+      const courseIdParam = (req.params as any).id as string | string[] | undefined;
+      const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : courseIdParam;
+
+      if (!courseId) {
+        return next(new ErrorHandler("Course id is required", 400));
+      }
       //check if the course id exist in then UserCourseList based on the _id
       const courseExists = userCourseList?.find(
         (course: any) => course?.courseId?.toString() === courseId
@@ -419,13 +430,18 @@ export const getAllCoursesAdmin = catchAsyncErrors(
 //delete Course ---only for admins
 export const deleteCourse=catchAsyncErrors(async(req: Request, res: Response, next: NextFunction)=>{
   try {
-    const {id} =req.params ;
+    const idParam = (req.params as any).id as string | string[] | undefined;
+    const id = Array.isArray(idParam) ? idParam[0] : idParam;
+    if (!id) {
+      return next(new ErrorHandler("Course id is required", 400));
+    }
+
     const course=await CourseModel.findById(id);
     if (!course) {
     return next(new ErrorHandler("Course not found", 400));
     }
-    await course.deleteOne({id });
-    await redis.del(id);
+    await course.deleteOne();
+    await redis.del(String(id));
     res.status(201).json({
     success: true,
     message: "Course deleted successfully."
