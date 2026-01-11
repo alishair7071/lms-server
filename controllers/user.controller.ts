@@ -167,15 +167,54 @@ export const LoginUser = catchAsyncErrors(
 export const logoutUser = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Logout should be resilient: even if access/refresh token is missing/expired
+      // we still clear cookies and return success so the UI can update immediately.
+      console.log("logout requested");
 
-      console.log("logged out from the server");
-      res.cookie("access_token", "", { maxAge: 1 });
-      res.cookie("refresh_token", "", { maxAge: 1 });
+      // Best-effort: delete session from redis if we can infer the user id from cookies
+      let userId = "";
+      const accessToken = req.cookies?.access_token as string | undefined;
+      const refreshToken = req.cookies?.refresh_token as string | undefined;
 
-      const userId = req.user?._id ? String(req.user._id) : "";
+      try {
+        if (accessToken) {
+          const decoded = jwt.verify(
+            accessToken,
+            process.env.ACCESS_TOKEN as string
+          ) as JwtPayload;
+          if (decoded?.id) userId = String(decoded.id);
+        }
+      } catch {
+        // ignore
+      }
 
-      await redis.del(userId);
-      console.log("logged out successfully from the server");
+      try {
+        if (!userId && refreshToken) {
+          const decoded = jwt.verify(
+            refreshToken,
+            process.env.REFRESH_TOKEN as string
+          ) as JwtPayload;
+          if (decoded?.id) userId = String(decoded.id);
+        }
+      } catch {
+        // ignore
+      }
+
+      if (userId) {
+        await redis.del(userId);
+      }
+
+      // Clear cookies using the same options they were set with (important for deletion)
+      res.cookie("access_token", "", {
+        ...accessTokenOptions,
+        maxAge: 0,
+        expires: new Date(0),
+      });
+      res.cookie("refresh_token", "", {
+        ...refreshTokenOptions,
+        maxAge: 0,
+        expires: new Date(0),
+      });
 
       res.status(200).json({
         success: true,

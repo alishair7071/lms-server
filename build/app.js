@@ -26,6 +26,7 @@ const corsOptions = {
         ? (origin, callback) => {
             const allowList = [
                 process.env.CLIENT_URL,
+                "https://lms-client-1ofg.vercel.app",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
             ].filter(Boolean);

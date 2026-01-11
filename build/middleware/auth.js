@@ -11,6 +11,11 @@ const redis_1 = require("../utils/redis");
 const catchAsyncErrors_1 = require("./catchAsyncErrors");
 //Authenticated User....
 exports.isAuthenticated = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
+    // If a previous middleware (e.g. updateAccessToken) already attached the user,
+    // treat the request as authenticated.
+    if (req.user) {
+        return next();
+    }
     const access_token = req.cookies?.access_token;
     if (!access_token) {
         return next(new ErrorHandler_1.default("Please login to access this resource", 400));

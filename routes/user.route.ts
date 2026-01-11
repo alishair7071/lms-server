@@ -20,7 +20,9 @@ const userRouter = express.Router();
 userRouter.post("/registration", registrationUser);
 userRouter.post("/activate-user", activateUser);
 userRouter.post("/login", LoginUser);
-userRouter.get("/logout", isAuthenticated, logoutUser);
+// Logout should always be callable (even if access token is expired/missing)
+// so the client can clear cookies and local session state reliably.
+userRouter.get("/logout", logoutUser);
 userRouter.get("/refresh", updateAccessToken);
 userRouter.get("/me", isAuthenticated, getUserInfo);
 userRouter.post("/social-auth", socialAuth);

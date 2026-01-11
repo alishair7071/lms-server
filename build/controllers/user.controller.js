@@ -111,12 +111,47 @@ exports.LoginUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, ne
 //logout user
 exports.logoutUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
-        console.log("logged out from the server");
-        res.cookie("access_token", "", { maxAge: 1 });
-        res.cookie("refresh_token", "", { maxAge: 1 });
-        const userId = req.user?._id ? String(req.user._id) : "";
-        await redis_1.redis.del(userId);
-        console.log("logged out successfully from the server");
+        // Logout should be resilient: even if access/refresh token is missing/expired
+        // we still clear cookies and return success so the UI can update immediately.
+        console.log("logout requested");
+        // Best-effort: delete session from redis if we can infer the user id from cookies
+        let userId = "";
+        const accessToken = req.cookies?.access_token;
+        const refreshToken = req.cookies?.refresh_token;
+        try {
+            if (accessToken) {
+                const decoded = jsonwebtoken_1.default.verify(accessToken, process.env.ACCESS_TOKEN);
+                if (decoded?.id)
+                    userId = String(decoded.id);
+            }
+        }
+        catch {
+            // ignore
+        }
+        try {
+            if (!userId && refreshToken) {
+                const decoded = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN);
+                if (decoded?.id)
+                    userId = String(decoded.id);
+            }
+        }
+        catch {
+            // ignore
+        }
+        if (userId) {
+            await redis_1.redis.del(userId);
+        }
+        // Clear cookies using the same options they were set with (important for deletion)
+        res.cookie("access_token", "", {
+            ...jwt_2.accessTokenOptions,
+            maxAge: 0,
+            expires: new Date(0),
+        });
+        res.cookie("refresh_token", "", {
+            ...jwt_3.refreshTokenOptions,
+            maxAge: 0,
+            expires: new Date(0),
+        });
         res.status(200).json({
             success: true,
             message: "Logged out successfully",

@@ -15,6 +15,7 @@ orderRouter.get(
 );
 
 orderRouter.get('/payment/stripePublishAbleKey', sendStripePublishableKey);
-orderRouter.post('/payment/process', isAuthenticated, newPayment);
+// Use refresh-token flow so users with an expired access token can still pay
+orderRouter.post('/payment/process', updateAccessToken, isAuthenticated, newPayment);
 
 export default orderRouter;

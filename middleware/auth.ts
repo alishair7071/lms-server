@@ -8,6 +8,11 @@ import { catchAsyncErrors } from "./catchAsyncErrors";
 //Authenticated User....
 export const isAuthenticated = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
+    // If a previous middleware (e.g. updateAccessToken) already attached the user,
+    // treat the request as authenticated.
+    if (req.user) {
+      return next();
+    }
     const access_token = req.cookies?.access_token as string;
     if (!access_token) {
       return next(
