@@ -288,6 +288,20 @@ export const getUserInfo = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user?._id ? String(req.user._id) : "";
+      // TESTING MODE: if there's no authenticated user, don't throw — return a guest payload.
+      if (!userId) {
+        return res.status(200).json({
+          success: true,
+          accessToken: "",
+          user: {
+            _id: "",
+            name: "Guest",
+            email: "",
+            role: "guest",
+            courses: [],
+          },
+        });
+      }
       getUserById(userId, res);
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 400));

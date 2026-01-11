@@ -31,6 +31,7 @@ export const createOrder = catchAsyncErrors(
   
     try {
       const { courseId, payment_info } = req.body as IOrder;
+      const userIdFromBody = (req.body as any)?.userId as string | undefined;
       const normalizedCourseId = String(courseId);
       //Verify Stripe Payment Intent if payment_info is provided
       if (payment_info) {
@@ -47,7 +48,8 @@ export const createOrder = catchAsyncErrors(
         
 
         //Check if the course is already purchased by the user
-      const user = await userModel.findById(req.user?._id);
+      const userId = req.user?._id ? String(req.user._id) : userIdFromBody ? String(userIdFromBody) : "";
+      const user = userId ? await userModel.findById(userId) : null;
       const courseExistInUser = user?.courses?.some((course: any) => {
         // tolerate historical bad data where `courses` items might be raw ids/strings
         const id = course?.courseId ?? course?._id ?? course;
@@ -67,7 +69,7 @@ export const createOrder = catchAsyncErrors(
 
       const data: any = {
         courseId: course._id,
-        userId: user?._id,
+        userId: user?._id ?? userId,
         payment_info,
       };
 
@@ -104,16 +106,20 @@ export const createOrder = catchAsyncErrors(
       }
 
       // Store consistently with the user schema: { courseId: string }
-      user?.courses.push({ courseId: course._id.toString() } as any);
-      await redis.set(String(req.user!._id), JSON.stringify(user));
-      await user?.save();
+      if (user) {
+        user.courses.push({ courseId: course._id.toString() } as any);
+        await redis.set(String(user._id), JSON.stringify(user));
+        await user.save();
+      }
       course.purchased = (course.purchased || 0) + 1;
       await course.save();
-      await NotificationModel.create({
-        user: user?._id,
-        title: "New Order",
-        message: `You have a new Ordr from ${course.name}`,
-      });
+      if (user?._id) {
+        await NotificationModel.create({
+          user: user._id,
+          title: "New Order",
+          message: `You have a new Ordr from ${course.name}`,
+        });
+      }
 
       newOrder(data, res, next);
 
