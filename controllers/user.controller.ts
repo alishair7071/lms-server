@@ -230,12 +230,26 @@ export const logoutUser = catchAsyncErrors(
 export const updateAccessToken = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const refresh_token = req.cookies.refresh_token as string;
-      const decode = jwt.verify(
-        refresh_token,
-        process.env.REFRESH_TOKEN as string
-      ) as JwtPayload;
-      if (!decode) {
+      const refresh_token = req.cookies?.refresh_token as string | undefined;
+
+      // If there's no refresh token cookie, we can't refresh.
+      // Treat as "no-op" middleware so routes can still authenticate via access token.
+      if (!refresh_token) {
+        return next();
+      }
+
+      let decode: JwtPayload | null = null;
+      try {
+        decode = jwt.verify(
+          refresh_token,
+          process.env.REFRESH_TOKEN as string
+        ) as JwtPayload;
+      } catch {
+        // Invalid/expired refresh token; let downstream auth (access token) decide.
+        return next();
+      }
+
+      if (!decode?.id) {
         return next(new ErrorHandler("Could not Refresh token", 400));
       }
       const session = await redis.get(String(decode.id));
@@ -254,6 +268,9 @@ export const updateAccessToken = catchAsyncErrors(
         process.env.REFRESH_TOKEN as string
       );
       req.user = user;
+      // for route handlers that want the refreshed access token in the response
+      res.locals.user = user;
+      res.locals.accessToken = accessToken;
       res.cookie("access_token", accessToken, accessTokenOptions);
       res.cookie("refresh_token", refresh_Token, refreshTokenOptions);
 
