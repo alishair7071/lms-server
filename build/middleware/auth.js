@@ -5,12 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authorizeRoles = exports.isAuthenticated = void 0;
 require("dotenv").config();
-const ErrorHandler_1 = __importDefault(require("../utils/ErrorHandler"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const redis_1 = require("../utils/redis");
 const catchAsyncErrors_1 = require("./catchAsyncErrors");
 //Authenticated User....
 exports.isAuthenticated = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
+    // TESTING MODE: do not hard-fail requests that are missing/expired tokens.
+    // If tokens exist, we still try to attach req.user for downstream handlers.
     // If a previous middleware (e.g. updateAccessToken) already attached the user,
     // treat the request as authenticated.
     if (req.user) {
@@ -18,15 +19,20 @@ exports.isAuthenticated = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, r
     }
     const access_token = req.cookies?.access_token;
     if (!access_token) {
-        return next(new ErrorHandler_1.default("Please login to access this resource", 400));
+        return next();
     }
-    const decode = jsonwebtoken_1.default.verify(access_token, process.env.ACCESS_TOKEN);
-    if (!decode) {
-        return next(new ErrorHandler_1.default("Access token is not valid!", 400));
+    let decode = null;
+    try {
+        decode = jsonwebtoken_1.default.verify(access_token, process.env.ACCESS_TOKEN);
     }
+    catch {
+        return next();
+    }
+    if (!decode?.id)
+        return next();
     const user = await redis_1.redis.get(decode.id);
     if (!user) {
-        return next(new ErrorHandler_1.default("Please login to access this resourse", 400));
+        return next();
     }
     req.user = JSON.parse(user);
     next();
@@ -34,8 +40,7 @@ exports.isAuthenticated = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, r
 //validate user role
 const authorizeRoles = (...roles) => {
     return (req, res, next) => {
-        if (!roles.includes(req.user?.role || ""))
-            return next(new ErrorHandler_1.default(`Role: ${req.user?.role} is not allowed to access this resourse`, 403));
+        // TESTING MODE: skip role checks
         next();
     };
 };

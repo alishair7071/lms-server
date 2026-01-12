@@ -156,7 +156,14 @@ export const getAllCourses = catchAsyncErrors(
 export const getCourseByUser = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userCourseList = req.user?.courses;
+      // Frontend-only auth/testing mode:
+      // If req.user isn't present, allow passing userId as a query param and validate purchases via DB.
+      const userIdFromQuery = (req.query.userId as string | undefined) ?? "";
+      const userCourseList =
+        req.user?.courses ??
+        (userIdFromQuery
+          ? (await userModel.findById(userIdFromQuery).select("courses"))?.courses
+          : undefined);
       const courseId = req.params.id;
       const courseExist = userCourseList?.find((course: any) => {
         // tolerate historical bad data where `courses` items might be raw ids/strings

@@ -132,7 +132,13 @@ exports.getAllCourses = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res
 //get course Content ---only for valid users
 exports.getCourseByUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
-        const userCourseList = req.user?.courses;
+        // Frontend-only auth/testing mode:
+        // If req.user isn't present, allow passing userId as a query param and validate purchases via DB.
+        const userIdFromQuery = req.query.userId ?? "";
+        const userCourseList = req.user?.courses ??
+            (userIdFromQuery
+                ? (await userModel.findById(userIdFromQuery).select("courses"))?.courses
+                : undefined);
         const courseId = req.params.id;
         const courseExist = userCourseList?.find((course) => {
             // tolerate historical bad data where `courses` items might be raw ids/strings

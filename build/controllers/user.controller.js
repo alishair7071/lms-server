@@ -164,9 +164,21 @@ exports.logoutUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, n
 //update access token
 exports.updateAccessToken = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
-        const refresh_token = req.cookies.refresh_token;
-        const decode = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN);
-        if (!decode) {
+        const refresh_token = req.cookies?.refresh_token;
+        // If there's no refresh token cookie, we can't refresh.
+        // Treat as "no-op" middleware so routes can still authenticate via access token.
+        if (!refresh_token) {
+            return next();
+        }
+        let decode = null;
+        try {
+            decode = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN);
+        }
+        catch {
+            // Invalid/expired refresh token; let downstream auth (access token) decide.
+            return next();
+        }
+        if (!decode?.id) {
             return next(new ErrorHandler_1.default("Could not Refresh token", 400));
         }
         const session = await redis_1.redis.get(String(decode.id));
@@ -177,6 +189,9 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req,
         const accessToken = jsonwebtoken_1.default.sign({ id: user._id }, process.env.ACCESS_TOKEN);
         const refresh_Token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.REFRESH_TOKEN);
         req.user = user;
+        // for route handlers that want the refreshed access token in the response
+        res.locals.user = user;
+        res.locals.accessToken = accessToken;
         res.cookie("access_token", accessToken, jwt_2.accessTokenOptions);
         res.cookie("refresh_token", refresh_Token, jwt_3.refreshTokenOptions);
         await redis_1.redis.set(String(user._id), JSON.stringify(user), "EX", 604800);
@@ -190,6 +205,20 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req,
 exports.getUserInfo = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
         const userId = req.user?._id ? String(req.user._id) : "";
+        // TESTING MODE: if there's no authenticated user, don't throw — return a guest payload.
+        if (!userId) {
+            return res.status(200).json({
+                success: true,
+                accessToken: "",
+                user: {
+                    _id: "",
+                    name: "Guest",
+                    email: "",
+                    role: "guest",
+                    courses: [],
+                },
+            });
+        }
         (0, user_service_1.getUserById)(userId, res);
     }
     catch (error) {

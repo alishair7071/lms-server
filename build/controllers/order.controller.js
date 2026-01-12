@@ -29,6 +29,7 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
         const { courseId, payment_info } = req.body;
+        const userIdFromBody = req.body?.userId;
         const normalizedCourseId = String(courseId);
         //Verify Stripe Payment Intent if payment_info is provided
         if (payment_info) {
@@ -41,7 +42,8 @@ exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, 
             }
         }
         //Check if the course is already purchased by the user
-        const user = await user_model_1.default.findById(req.user?._id);
+        const userId = req.user?._id ? String(req.user._id) : userIdFromBody ? String(userIdFromBody) : "";
+        const user = userId ? await user_model_1.default.findById(userId) : null;
         const courseExistInUser = user?.courses?.some((course) => {
             // tolerate historical bad data where `courses` items might be raw ids/strings
             const id = course?.courseId ?? course?._id ?? course;
@@ -58,7 +60,7 @@ exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, 
         }
         const data = {
             courseId: course._id,
-            userId: user?._id,
+            userId: user?._id ?? userId,
             payment_info,
         };
         const mailData = {
@@ -88,16 +90,20 @@ exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, 
             return next(new ErrorHandler_1.default(error.message, 400));
         }
         // Store consistently with the user schema: { courseId: string }
-        user?.courses.push({ courseId: course._id.toString() });
-        await redis_1.redis.set(String(req.user._id), JSON.stringify(user));
-        await user?.save();
+        if (user) {
+            user.courses.push({ courseId: course._id.toString() });
+            await redis_1.redis.set(String(user._id), JSON.stringify(user));
+            await user.save();
+        }
         course.purchased = (course.purchased || 0) + 1;
         await course.save();
-        await notificationModel_1.default.create({
-            user: user?._id,
-            title: "New Order",
-            message: `You have a new Ordr from ${course.name}`,
-        });
+        if (user?._id) {
+            await notificationModel_1.default.create({
+                user: user._id,
+                title: "New Order",
+                message: `You have a new Ordr from ${course.name}`,
+            });
+        }
         (0, order_service_1.newOrder)(data, res, next);
     }
     catch (error) {

@@ -13,8 +13,22 @@ userRouter.post("/login", user_controller_1.LoginUser);
 // Logout should always be callable (even if access token is expired/missing)
 // so the client can clear cookies and local session state reliably.
 userRouter.get("/logout", user_controller_1.logoutUser);
-userRouter.get("/refresh", user_controller_1.updateAccessToken);
-userRouter.get("/me", auth_1.isAuthenticated, user_controller_1.getUserInfo);
+// Refresh endpoint: updates cookies via updateAccessToken and returns the latest user/token
+userRouter.get("/refresh", user_controller_1.updateAccessToken, (req, res) => {
+    if (!req.user) {
+        return res.status(401).json({
+            success: false,
+            message: "Could not Refresh token",
+        });
+    }
+    return res.status(200).json({
+        success: true,
+        accessToken: res.locals.accessToken,
+        user: res.locals.user,
+    });
+});
+// Ensure user info works even if access token expired (refresh first)
+userRouter.get("/me", user_controller_1.updateAccessToken, auth_1.isAuthenticated, user_controller_1.getUserInfo);
 userRouter.post("/social-auth", user_controller_1.socialAuth);
 userRouter.put("/update-user-info", auth_1.isAuthenticated, user_controller_1.updateUserInfo);
 userRouter.put("/update-user-password", auth_1.isAuthenticated, user_controller_1.updateUserPassword);
