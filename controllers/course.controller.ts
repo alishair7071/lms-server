@@ -4,6 +4,7 @@ import { createCourse, getAllCoursesService } from "../services/course.service";
 import cloudinary from "cloudinary";
 import ErrorHandler from "../utils/ErrorHandler";
 import CourseModel from "../models/course.model";
+import userModel from "../models/user.model";
 import { redis } from "../utils/redis";
 import mongoose from "mongoose";
 import ejs from "ejs";

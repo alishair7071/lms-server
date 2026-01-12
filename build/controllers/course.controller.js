@@ -9,6 +9,7 @@ const course_service_1 = require("../services/course.service");
 const cloudinary_1 = __importDefault(require("cloudinary"));
 const ErrorHandler_1 = __importDefault(require("../utils/ErrorHandler"));
 const course_model_1 = __importDefault(require("../models/course.model"));
+const user_model_1 = __importDefault(require("../models/user.model"));
 const redis_1 = require("../utils/redis");
 const mongoose_1 = __importDefault(require("mongoose"));
 const ejs_1 = __importDefault(require("ejs"));
@@ -137,7 +138,7 @@ exports.getCourseByUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, r
         const userIdFromQuery = req.query.userId ?? "";
         const userCourseList = req.user?.courses ??
             (userIdFromQuery
-                ? (await userModel.findById(userIdFromQuery).select("courses"))?.courses
+                ? (await user_model_1.default.findById(userIdFromQuery).select("courses"))?.courses
                 : undefined);
         const courseId = req.params.id;
         const courseExist = userCourseList?.find((course) => {
