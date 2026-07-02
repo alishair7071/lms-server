@@ -205,19 +205,8 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req,
 exports.getUserInfo = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
         const userId = req.user?._id ? String(req.user._id) : "";
-        // TESTING MODE: if there's no authenticated user, don't throw — return a guest payload.
         if (!userId) {
-            return res.status(200).json({
-                success: true,
-                accessToken: "",
-                user: {
-                    _id: "",
-                    name: "Guest",
-                    email: "",
-                    role: "guest",
-                    courses: [],
-                },
-            });
+            return next(new ErrorHandler_1.default("Please login to access this resource", 401));
         }
         (0, user_service_1.getUserById)(userId, res);
     }

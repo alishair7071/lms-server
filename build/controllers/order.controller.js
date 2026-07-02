@@ -29,7 +29,6 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
         const { courseId, payment_info } = req.body;
-        const userIdFromBody = req.body?.userId;
         const normalizedCourseId = String(courseId);
         //Verify Stripe Payment Intent if payment_info is provided
         if (payment_info) {
@@ -42,7 +41,7 @@ exports.createOrder = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, 
             }
         }
         //Check if the course is already purchased by the user
-        const userId = req.user?._id ? String(req.user._id) : userIdFromBody ? String(userIdFromBody) : "";
+        const userId = req.user?._id ? String(req.user._id) : "";
         const user = userId ? await user_model_1.default.findById(userId) : null;
         const courseExistInUser = user?.courses?.some((course) => {
             // tolerate historical bad data where `courses` items might be raw ids/strings
@@ -129,14 +128,29 @@ exports.sendStripePublishableKey = (0, catchAsyncErrors_1.catchAsyncErrors)(asyn
 //newPayment
 exports.newPayment = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
-        if (!stripe) {
+        if (!STRIPE_SECRET_KEY) {
             return next(new ErrorHandler_1.default("Stripe is not configured on the server. Please contact support.", 500));
         }
+        // Derive the amount from the course price on the server. Never trust an amount
+        // sent by the client, otherwise a user could pay an arbitrary price.
+        const { courseId } = req.body;
+        if (!courseId) {
+            return next(new ErrorHandler_1.default("Course id is required", 400));
+        }
+        const course = await course_model_1.default.findById(courseId);
+        if (!course) {
+            return next(new ErrorHandler_1.default("Course not found.", 404));
+        }
+        const amount = Math.round(Number(course.price) * 100);
+        if (!Number.isFinite(amount) || amount < 1) {
+            return next(new ErrorHandler_1.default("This course is not purchasable", 400));
+        }
         const myPayment = await stripe.paymentIntents.create({
-            amount: req.body.amount,
+            amount,
             currency: 'USD',
             metadata: {
                 company: "ELearning",
+                courseId: String(courseId),
             },
             automatic_payment_methods: {
                 enabled: true,
@@ -146,7 +160,6 @@ exports.newPayment = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, n
             client_secret: myPayment.client_secret,
             success: true
         });
-        console.log("myPayment", myPayment);
     }
     catch (error) {
         return next(new ErrorHandler_1.default(error.message, 500));

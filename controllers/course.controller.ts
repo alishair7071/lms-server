@@ -4,7 +4,6 @@ import { createCourse, getAllCoursesService } from "../services/course.service";
 import cloudinary from "cloudinary";
 import ErrorHandler from "../utils/ErrorHandler";
 import CourseModel from "../models/course.model";
-import userModel from "../models/user.model";
 import { redis } from "../utils/redis";
 import mongoose from "mongoose";
 import ejs from "ejs";
@@ -157,14 +156,9 @@ export const getAllCourses = catchAsyncErrors(
 export const getCourseByUser = catchAsyncErrors(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Frontend-only auth/testing mode:
-      // If req.user isn't present, allow passing userId as a query param and validate purchases via DB.
-      const userIdFromQuery = (req.query.userId as string | undefined) ?? "";
-      const userCourseList =
-        req.user?.courses ??
-        (userIdFromQuery
-          ? (await userModel.findById(userIdFromQuery).select("courses"))?.courses
-          : undefined);
+      // Only the authenticated user's own purchases decide access — never a
+      // client-supplied id.
+      const userCourseList = req.user?.courses;
       const courseId = req.params.id;
       const courseExist = userCourseList?.find((course: any) => {
         // tolerate historical bad data where `courses` items might be raw ids/strings

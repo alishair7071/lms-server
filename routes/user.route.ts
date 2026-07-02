@@ -70,7 +70,6 @@ userRouter.put(
 userRouter.delete(
   "/delete-user/:id",
   updateAccessToken,
-  updateAccessToken,
   isAuthenticated,
   authorizeRoles("admin"),
   deleteUser

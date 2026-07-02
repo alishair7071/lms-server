@@ -9,7 +9,6 @@ const course_service_1 = require("../services/course.service");
 const cloudinary_1 = __importDefault(require("cloudinary"));
 const ErrorHandler_1 = __importDefault(require("../utils/ErrorHandler"));
 const course_model_1 = __importDefault(require("../models/course.model"));
-const user_model_1 = __importDefault(require("../models/user.model"));
 const redis_1 = require("../utils/redis");
 const mongoose_1 = __importDefault(require("mongoose"));
 const ejs_1 = __importDefault(require("ejs"));
@@ -133,13 +132,9 @@ exports.getAllCourses = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res
 //get course Content ---only for valid users
 exports.getCourseByUser = (0, catchAsyncErrors_1.catchAsyncErrors)(async (req, res, next) => {
     try {
-        // Frontend-only auth/testing mode:
-        // If req.user isn't present, allow passing userId as a query param and validate purchases via DB.
-        const userIdFromQuery = req.query.userId ?? "";
-        const userCourseList = req.user?.courses ??
-            (userIdFromQuery
-                ? (await user_model_1.default.findById(userIdFromQuery).select("courses"))?.courses
-                : undefined);
+        // Only the authenticated user's own purchases decide access — never a
+        // client-supplied id.
+        const userCourseList = req.user?.courses;
         const courseId = req.params.id;
         const courseExist = userCourseList?.find((course) => {
             // tolerate historical bad data where `courses` items might be raw ids/strings
